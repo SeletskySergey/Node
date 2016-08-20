@@ -5,6 +5,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography.X509Certificates;
+using System.Threading.Tasks;
 
 namespace Node.Net
 {
@@ -12,35 +13,35 @@ namespace Node.Net
     {
         public readonly ConcurrentQueue<Node> Connections = new ConcurrentQueue<Node>();
         private readonly X509Certificate2 certificate;
-        private readonly IPEndPoint endPoint;
+        private readonly TcpListener listener;
+
         private bool active;
 
-        public NetServer(IPEndPoint endPoint, X509Certificate2 cert = null)
+        public NetServer(IPEndPoint endpoint, X509Certificate2 cert = null)
         {
+            listener = new TcpListener(endpoint);
             this.certificate = cert;
-            this.endPoint = endPoint;
         }
 
-        public bool Send(IPEndPoint endPoint, byte[] data)
+        public bool Send(IPEndPoint endpoint, Message msg)
         {
-            var client = Connections.FirstOrDefault(x => x.EndPoint.Address.Equals(endPoint.Address) && x.Connected);
+            var client = Connections.FirstOrDefault(x => x.EndPoint.Address.Equals(endpoint.Address) && x.Connected);
             if (client != null)
             {
-                client.Send(data);
+                client.Send(msg);
                 return true;
             }
             return false;
         }
 
-        public bool IsConnected(IPEndPoint endPoint)
+        public bool IsConnected(IPEndPoint endpoint)
         {
-            return Connections.Any(a => a.EndPoint.Address.Equals(endPoint.Address) && a.Connected);
+            return Connections.Any(a => a.EndPoint.Address.Equals(endpoint.Address) && a.Connected);
         }
 
-        public async void Start()
+        public async Task Start()
         {
             active = true;
-            var listener = new TcpListener(endPoint);
             try
             {
                 listener.Start();
@@ -79,7 +80,7 @@ namespace Node.Net
             Disconnected();
         }
 
-        public event Action<byte[]> Received = data => { };
+        public event Action<Message> Received = msg => { };
         public event Action Disconnected = () => { };
         public event Action Connected = () => { };
         public event Action Started = () => { };

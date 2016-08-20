@@ -1,6 +1,8 @@
 ﻿using System;
 using System.IO;
 using System.IO.Compression;
+using System.Threading.Tasks;
+using ProtoBuf;
 
 namespace Node.Net
 {
@@ -28,7 +30,7 @@ namespace Node.Net
 
         public byte[] Data;
 
-        public static Message Deserialize(byte[] data)
+        public static async Task<Message> Deserialize(byte[] data, bool decompress = false)
         {
             var length = BitConverter.ToInt32(data, 4);
             var body = new byte[length];
@@ -37,25 +39,34 @@ namespace Node.Net
             var msg = new Message(data[1], data[2], data[3])
             {
                 Version = data[0],
-                Data = Decompress(body)
+                Data = body
             };
+
+            if (decompress)
+            {
+                msg.Data = await Decompress(body);
+            }
+
             return msg;
         }
 
-        public static byte[] Serialize(Message msg)
+        public async Task<byte[]> Serialize(bool commpress = false)
         {
             byte[] bytes;
             using (var ms = new MemoryStream())
             {
-                ms.WriteByte(msg.Version);
-                ms.WriteByte(msg.Module);
-                ms.WriteByte(msg.Command);
-                ms.WriteByte(msg.Action);
+                ms.WriteByte(Version);
+                ms.WriteByte(Module);
+                ms.WriteByte(Command);
+                ms.WriteByte(Action);
 
-                msg.Data = Compress(msg.Data);
+                if (commpress)
+                {
+                    Data = await Compress(Data);
+                }
 
-                ms.Write(BitConverter.GetBytes(msg.Data.Length), 0, 4);
-                ms.Write(msg.Data, 0, msg.Data.Length);
+                await ms.WriteAsync(BitConverter.GetBytes(Data.Length), 0, 4);
+                await ms.WriteAsync(Data, 0, Data.Length);
                 bytes = ms.ToArray();
             }
             return bytes;
@@ -87,29 +98,29 @@ namespace Node.Net
             return data;
         }
 
-        private static byte[] Compress(byte[] bytes)
+        private static async Task<byte[]> Compress(byte[] bytes)
         {
             using (var destination = new MemoryStream())
             {
                 using (var output = new GZipStream(destination, CompressionMode.Compress))
                 {
-                    output.Write(bytes, 0, bytes.Length);
+                    await output.WriteAsync(bytes, 0, bytes.Length);
                 }
                 return destination.ToArray();
             }
         }
 
-        private static byte[] Decompress(byte[] bytes)
+        private static async Task<byte[]> Decompress(byte[] bytes)
         {
             using (var source = new MemoryStream(bytes))
             {
                 using (var input = new GZipStream(source, CompressionMode.Decompress))
                 {
-                    var buffer = new byte[input.Length];
-                    var count = input.Read(buffer, 0, (int)input.Length);
-                    var destination = new byte[count];
-                    Buffer.BlockCopy(buffer, 0, destination, 0, count);
-                    return destination;
+                    using (var output = new MemoryStream())
+                    {
+                        await input.CopyToAsync(output);
+                        return output.ToArray();
+                    }    
                 }
             }
         }

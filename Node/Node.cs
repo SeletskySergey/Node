@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -10,6 +11,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading.Tasks;
 using Node.Net;
+using ProtoBuf;
 
 namespace Node
 {
@@ -28,7 +30,7 @@ namespace Node
             certificate = cert;
             EndPoint = endPoint;
             client = new TcpClient();
-            receiver = new Task(Receive);
+            receiver = new Task(Receiver);
         }
 
         public Node(TcpClient client, X509Certificate2 cert = null)
@@ -36,19 +38,22 @@ namespace Node
             certificate = cert;
             this.client = client;
             EndPoint = (IPEndPoint)client.Client.RemoteEndPoint;
-            receiver = new Task(Receive);
+            receiver = new Task(Receiver);
         }
 
-        public bool Connected
-        {
-            get { return active && client.Connected; }
-        }
+        public bool Connected => active && client.Connected;
 
-        public void Send(byte[] data)
+        public void Send(Message msg)
         {
             try
             {
-                stream.Write(data, 0, data.Length);
+                msg.Serialize().ContinueWith(ts => //Do not add async here
+                {
+                    stream.WriteAsync(ts.Result, 0, ts.Result.Length).ContinueWith(tw =>
+                    {
+                        stream.FlushAsync();
+                    });
+                });
             }
             catch (IOException)
             {
@@ -56,13 +61,14 @@ namespace Node
             }
         }
 
-        private void Receive()
+        private void Receiver()
         {
             while (active)
             {
                 try
                 {
-                    Received(Message.Get(stream));
+                    var data = Message.Get(stream);
+                    Message.Deserialize(data).ContinueWith(task => Received(task.Result)); //Do not add await here!
                 }
                 catch (IOException)
                 {
@@ -100,7 +106,7 @@ namespace Node
 
                 if (receiver.Status == TaskStatus.Created)
                 {
-                    receiver = new Task(Receive);
+                    receiver = new Task(Receiver);
                     receiver.Start();
                 }
             }
@@ -141,9 +147,14 @@ namespace Node
         {
             try
             {
-                byte[] data = Message.Serialize(new Message());
-                stream.Write(data, 0, data.Length);
-                stream.Flush();
+                var msg = new Message();
+                using (var ms = new MemoryStream())
+                {
+                    Serializer.Serialize(ms, instance);
+                    msg.Data = ms.ToArray();
+                    //msg.Command = GetCommand(typeof(T));
+                }
+                Send(msg);
             }
             catch (IOException)
             {
@@ -151,17 +162,17 @@ namespace Node
             }
         }
 
-        public void Subscribe<T>(Action<T> action)
+        public async Task Subscribe<T>(Action<T> action)
         {
             Received += msg =>
             {
-                //if (msg.Is<T>())
-                //{
-                //    using (var ms = new MemoryStream(msg.Data))
-                //    {
-                //        action(Serializer.Deserialize<T>(ms));
-                //    }
-                //}
+                if (msg.Module == 5) //TODO: Define a message to type mapping
+                {
+                    using (var ms = new MemoryStream(msg.Data))
+                    {
+                        action(Serializer.Deserialize<T>(ms));
+                    }
+                }
             };
         }
 
@@ -174,7 +185,7 @@ namespace Node
             }
         }
 
-        public event Action<byte[]> Received = data => { };
+        public event Action<Message> Received = msg => { };
         public event Action<Node> Disconnected = client => { };
 
         public event RemoteCertificateValidationCallback RemoteCertificateValidation = (sender, certificate, chain, sslPolicyErrors) =>
@@ -193,8 +204,6 @@ namespace Node
         {
             return localCertificates.Cast<X509Certificate>().FirstOrDefault();
         };
-
-        
     }
 }
 

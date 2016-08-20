@@ -14,6 +14,15 @@ namespace Node
 {
     internal class App
     {
+
+        private static readonly IPEndPoint Local;
+
+        static App()
+        {
+            var ip = Dns.GetHostEntry("127.0.0.1").AddressList.FirstOrDefault(x => x.AddressFamily == AddressFamily.InterNetwork);
+            Local = new IPEndPoint(ip, 17777);
+        }
+
         private static void Main()
         {
             Task.Factory.StartNew(Server);
@@ -28,24 +37,23 @@ namespace Node
 
             var cert = new X509Certificate2("cert.pfx", "Gagarin77$");
    
-            var dns = Dns.GetHostEntry("127.0.0.1").AddressList.FirstOrDefault(x => x.AddressFamily == AddressFamily.InterNetwork);
-            var endPoint = new IPEndPoint(dns, 17777);
-            var server = new NetServer(endPoint);
-
-            server.Received += d =>
+            var server = new NetServer(Local);
+            
+            server.Received += msg =>
             {
                 if (count == 0)
                 {
                     watch.Start();
                 }
                 Interlocked.Increment(ref count);
-                if (count >= 100000)
+                if (count >= 10000)
                 {
                     watch.Stop();
-                    Console.WriteLine("Server {0:0 000} Msg / {2}Kb : {1} ms.", count, watch.ElapsedMilliseconds, d.Length/1024.0);
+                    Console.WriteLine("Server {0:0 000} Msg / {2}Kb : {1} ms.", count, watch.ElapsedMilliseconds, msg.Data.Length/1024.0);
                     watch.Reset();
                     count = 0;
                 }
+                server.Send(Local, msg);
             };
 
             server.Disconnected += () => Console.WriteLine("Client is disconnected");
@@ -53,29 +61,9 @@ namespace Node
             server.Started += () => Console.WriteLine("Waiting for a connection...");
             server.Error += ex => Console.WriteLine(ex.Message);
             server.Stopped += () => Console.WriteLine("Server stoped !");
-            server.Start();
+            server.Start().Wait();
 
-            var msg = new Message(0, 0, 0) {Data = File.ReadAllBytes("Node.exe")};
-            var data = Message.Serialize(msg);
-
-            try
-            {
-                while (true)
-                {
-                    if (server.IsConnected(endPoint))
-                    {
-                        server.Send(endPoint, data);
-                    }
-                    else
-                    {
-                        Thread.Sleep(100);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex);
-            }
+            server.Send(Local, new Message(0, 0, 0) { Data = File.ReadAllBytes("Node.exe") }); //Init recursive sending
             Console.ReadKey();
         }
 
@@ -85,30 +73,29 @@ namespace Node
             var watch = new Stopwatch();
 
             Console.ForegroundColor = ConsoleColor.Green;
-            var dns = Dns.GetHostEntry("127.0.0.1").AddressList.FirstOrDefault(x => x.AddressFamily == AddressFamily.InterNetwork);
-            var endPoint = new IPEndPoint(dns, 17777);
 
             var store = new X509Store(StoreName.My, StoreLocation.CurrentUser);
             store.Open(OpenFlags.ReadOnly);
             X509CertificateCollection certs = store.Certificates.Find(X509FindType.FindBySubjectName, "Sergey Seletsky", true);
             var cert = certs.Cast<X509Certificate2>().FirstOrDefault();
 
-            var client = new Node(endPoint);
+            var client = new Node(Local);
 
-            client.Received += d =>
+            client.Received += msg =>
             {
                 if (count == 0)
                 {
                     watch.Start();
                 }
                 Interlocked.Increment(ref count);
-                if (count >= 100000)
+                if (count >= 10000)
                 {
                     watch.Stop();
-                    Console.WriteLine("Client {0:0 000} Msg / {2}Kb : {1} ms.", count, watch.ElapsedMilliseconds, d.Length/1024.0);
+                    Console.WriteLine("Client {0:0 000} Msg / {2}Kb : {1} ms.", count, watch.ElapsedMilliseconds, msg.Data.Length/1024.0);
                     watch.Reset();
                     count = 0;
                 }
+                client.Send(msg);
             };
 
             client.Disconnected += c =>
@@ -123,21 +110,7 @@ namespace Node
 
             client.Start();
 
-            var msg = new Message(0, 0, 0) { Data = File.ReadAllBytes("Node.exe") };
-
-            var data = Message.Serialize(msg);
-
-            while (true)
-            {
-                if (client.Connected)
-                {
-                    client.Send(data);
-                }
-                else
-                {
-                    Thread.Sleep(100);
-                }
-            }
+            client.Send(new Message(0, 0, 0) { Data = File.ReadAllBytes("Node.exe") }); // Init recursive sending
         }
     }
 }
