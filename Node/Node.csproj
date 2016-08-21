@@ -55,8 +55,8 @@
   <ItemGroup>
     <Compile Include="Node.cs" />
     <Compile Include="App.cs" />
-    <Compile Include="Net\Message.cs" />
-    <Compile Include="Net\NetServer.cs" />
+    <Compile Include="Message.cs" />
+    <Compile Include="Host.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="ProtoNavAttribute.cs" />
     <Compile Include="SslStreamInfo.cs" />

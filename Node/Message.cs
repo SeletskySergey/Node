@@ -1,18 +1,12 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
-using System.Reflection;
-using System.Runtime.InteropServices;
-using System.Threading.Tasks;
 using ProtoBuf;
 
-namespace Node.Net
+namespace Node
 {
     public struct Message
     {
-        private static readonly Dictionary<short, Type> Types = Assembly.GetExecutingAssembly().GetTypesWithAttribute();
-
         public Message(byte module, byte command, byte action)
         {
             this = new Message();
@@ -38,7 +32,7 @@ namespace Node.Net
 
         public object Contract;
 
-        public static async Task<Message> Deserialize(byte[] data, bool decompress = false)
+        public static Message Deserialize(byte[] data, bool decompress = false)
         {
             var msg = new Message(data[1], data[2], data[3])
             {
@@ -51,19 +45,19 @@ namespace Node.Net
 
             if (decompress)
             {
-                msg.Data = await Decompress(body);
+                msg.Data = Decompress(body);
             }
 
             var typeId = BitConverter.ToInt16(data, 4);
             using (var ms = new MemoryStream(msg.Data))
             {
-                msg.Contract = Serializer.Deserialize(Types[typeId], ms);
+                msg.Contract = Serializer.Deserialize(TypeNavigator.GetTypeById(typeId), ms);
             }
 
             return msg;
         }
 
-        public async Task<byte[]> Serialize(bool commpress = false)
+        public byte[] Serialize(bool commpress = false)
         {
             var bytes = new byte[0];
             try
@@ -75,7 +69,7 @@ namespace Node.Net
                     ms.WriteByte(Command);
                     ms.WriteByte(Action);
 
-                    await ms.WriteAsync(BitConverter.GetBytes(Contract.GetTypeId()), 0, 2);
+                    ms.Write(BitConverter.GetBytes(Contract.GetTypeId()), 0, 2);
                     using (var output = new MemoryStream())
                     {
                         Serializer.Serialize(output, Contract);
@@ -84,11 +78,11 @@ namespace Node.Net
 
                     if (commpress)
                     {
-                        Data = await Compress(Data);
+                        Data = Compress(Data);
                     }
 
-                    await ms.WriteAsync(BitConverter.GetBytes(Data.Length), 0, 4);
-                    await ms.WriteAsync(Data, 0, Data.Length);
+                    ms.Write(BitConverter.GetBytes(Data.Length), 0, 4);
+                    ms.Write(Data, 0, Data.Length);
                     bytes = ms.ToArray();
                 }
             }
@@ -125,19 +119,19 @@ namespace Node.Net
             return data;
         }
 
-        private static async Task<byte[]> Compress(byte[] bytes)
+        private static byte[] Compress(byte[] bytes)
         {
             using (var destination = new MemoryStream())
             {
                 using (var output = new GZipStream(destination, CompressionMode.Compress))
                 {
-                    await output.WriteAsync(bytes, 0, bytes.Length);
+                    output.Write(bytes, 0, bytes.Length);
                 }
                 return destination.ToArray();
             }
         }
 
-        private static async Task<byte[]> Decompress(byte[] bytes)
+        private static byte[] Decompress(byte[] bytes)
         {
             using (var source = new MemoryStream(bytes))
             {
@@ -145,7 +139,7 @@ namespace Node.Net
                 {
                     using (var output = new MemoryStream())
                     {
-                        await input.CopyToAsync(output);
+                        input.CopyTo(output);
                         return output.ToArray();
                     }    
                 }

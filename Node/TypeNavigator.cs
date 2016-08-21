@@ -9,25 +9,46 @@ namespace Node
 {
     public static class TypeNavigator
     {
-        public static Dictionary<short, Type> GetTypesWithAttribute(this Assembly assembly)
-        {
-            var dict = new Dictionary<short, Type>();
+        private static readonly Dictionary<Type, short> TypeToIdCache = new Dictionary<Type, short>();
+        private static readonly Dictionary<short, Type> IdToTypeCache = new Dictionary<short, Type>();
 
-            foreach (var type in assembly.GetTypes())
+        static TypeNavigator()
+        {
+            foreach (var type in Assembly.GetExecutingAssembly().GetTypes())
             {
                 if (type.GetCustomAttributes(typeof(ProtoNavAttribute), true).Length > 0)
                 {
                     var attr = type.GetCustomAttribute<ProtoNavAttribute>();
-                    dict.Add(attr.ContractTypeId, type);
+                    IdToTypeCache.Add(attr.ContractTypeId, type);
+                    TypeToIdCache.Add(type, attr.ContractTypeId);
                 }
             }
-
-            return dict;
         }
 
+        public static Dictionary<short, Type> GetTypesWithAttribute()
+        {
+            return IdToTypeCache;
+        }
+
+        
         public static short GetTypeId(this object obj)
         {
-            return obj.GetType().GetCustomAttribute<ProtoNavAttribute>().ContractTypeId;
+            var type = obj.GetType();
+            if (TypeToIdCache.ContainsKey(type))
+            {
+                return TypeToIdCache[type];
+            }
+            else
+            {
+                var id = type.GetCustomAttribute<ProtoNavAttribute>().ContractTypeId;
+                TypeToIdCache.Add(type, id);
+                return id;
+            }
+        }
+
+        public static Type GetTypeById(short id)
+        {
+            return IdToTypeCache[id];
         }
     }
 }

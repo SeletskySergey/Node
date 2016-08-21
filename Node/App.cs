@@ -10,14 +10,12 @@ using System.Security;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
-using Node.Net;
 using ProtoBuf;
 
 namespace Node
 {
     internal class App
     {
-
         private static readonly IPEndPoint Local;
 
         static App()
@@ -25,8 +23,6 @@ namespace Node
             var ip = Dns.GetHostEntry("127.0.0.1").AddressList.FirstOrDefault(x => x.AddressFamily == AddressFamily.InterNetwork);
             Local = new IPEndPoint(ip, 17777);
         }
-
-        
 
         private static void Main()
         {
@@ -42,7 +38,7 @@ namespace Node
 
             var cert = new X509Certificate2("cert.pfx", "Gagarin77$");
    
-            var server = new NetServer(Local);
+            var server = new Host(Local);
 
             server.Subscribe<TestContractClass>(msg =>
             {
@@ -114,7 +110,6 @@ namespace Node
             };
 
             client.Start();
-
             client.Publish(new TestContractClass()); // Init recursive sending
         }
     }

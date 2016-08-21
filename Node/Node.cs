@@ -11,7 +11,6 @@ using System.Security.Authentication;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading.Tasks;
-using Node.Net;
 using ProtoBuf;
 
 namespace Node
@@ -48,18 +47,14 @@ namespace Node
         {
             try
             {
-                msg.Serialize().ContinueWith(ts => //Do not add async here
-                {
-                    stream.WriteAsync(ts.Result, 0, ts.Result.Length).ContinueWith(tw =>
-                    {
-                        stream.FlushAsync();
-                    });
-                });
+                var data = msg.Serialize();
+                stream.Write(data, 0, data.Length);
+                stream.Flush();
             }
             catch (IOException)
             {
                 Disconnect();
-            }
+            }   
         }
 
         private void Receiver()
@@ -69,7 +64,8 @@ namespace Node
                 try
                 {
                     var data = Message.Get(stream);
-                    Message.Deserialize(data).ContinueWith(task => Received(task.Result)); //Do not add await here!
+                    var msg = Message.Deserialize(data);
+                    Received(msg);
                 }
                 catch (IOException)
                 {
@@ -146,15 +142,8 @@ namespace Node
 
         public void Publish<T>(T instance)
         {
-            try
-            {
-                var msg = new Message(0, 0, 0) { Contract = instance };
-                Send(msg);
-            }
-            catch (IOException)
-            {
-                Disconnect();
-            }
+            var msg = new Message(0, 0, 0) { Contract = instance };
+            Send(msg);
         }
 
         public void Subscribe<T>(Action<T> action)

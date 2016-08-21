@@ -7,9 +7,9 @@ using System.Net.Sockets;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
 
-namespace Node.Net
+namespace Node
 {
-    public sealed class NetServer
+    public sealed class Host
     {
         public readonly ConcurrentQueue<Node> Connections = new ConcurrentQueue<Node>();
         private readonly X509Certificate2 certificate;
@@ -17,7 +17,7 @@ namespace Node.Net
 
         private bool active;
 
-        public NetServer(IPEndPoint endpoint, X509Certificate2 cert = null)
+        public Host(IPEndPoint endpoint, X509Certificate2 cert = null)
         {
             listener = new TcpListener(endpoint);
             this.certificate = cert;
