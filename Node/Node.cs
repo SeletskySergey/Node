@@ -1,4 +1,5 @@
 ﻿using System;
+using System.CodeDom;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
@@ -43,7 +44,7 @@ namespace Node
 
         public bool Connected => active && client.Connected;
 
-        public void Send(Message msg)
+        private void Send(Message msg)
         {
             try
             {
@@ -143,17 +144,11 @@ namespace Node
             return stream;
         }
 
-        public void Publish<T>(IPEndPoint point, T instance)
+        public void Publish<T>(T instance)
         {
             try
             {
-                var msg = new Message();
-                using (var ms = new MemoryStream())
-                {
-                    Serializer.Serialize(ms, instance);
-                    msg.Data = ms.ToArray();
-                    //msg.Command = GetCommand(typeof(T));
-                }
+                var msg = new Message(0, 0, 0) { Contract = instance };
                 Send(msg);
             }
             catch (IOException)
@@ -162,16 +157,13 @@ namespace Node
             }
         }
 
-        public async Task Subscribe<T>(Action<T> action)
+        public void Subscribe<T>(Action<T> action)
         {
             Received += msg =>
             {
-                if (msg.Module == 5) //TODO: Define a message to type mapping
+                if (msg.Contract is T)
                 {
-                    using (var ms = new MemoryStream(msg.Data))
-                    {
-                        action(Serializer.Deserialize<T>(ms));
-                    }
+                    Task.Run(() => action((T)msg.Contract));
                 }
             };
         }
@@ -185,7 +177,7 @@ namespace Node
             }
         }
 
-        public event Action<Message> Received = msg => { };
+        private event Action<Message> Received = msg => { };
         public event Action<Node> Disconnected = client => { };
 
         public event RemoteCertificateValidationCallback RemoteCertificateValidation = (sender, certificate, chain, sslPolicyErrors) =>

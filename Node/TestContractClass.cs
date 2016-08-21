@@ -4,17 +4,18 @@ using System.Linq;
 using System.Runtime.Serialization;
 using System.Text;
 using System.Threading.Tasks;
+using ProtoBuf;
 
 namespace Node
 {
-    [DataContract(Namespace = "1")]
+    [ProtoContract, ProtoNav(19)]
     public class TestContractClass
     {
-        [DataMember(Order = 1)]
+        [ProtoMember(1)]
         public string One { set; get; } = string.Empty;
-        [DataMember(Order = 2)]
+        [ProtoMember(2)]
         public DateTime Two { set; get; } = DateTime.Now;
-        [DataMember(Order = 3)]
+        [ProtoMember(3)]
         public byte[] Three { set; get; } = new byte[1024];
     }
 }

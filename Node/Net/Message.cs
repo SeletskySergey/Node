@@ -1,6 +1,9 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
+using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using ProtoBuf;
 
@@ -8,6 +11,8 @@ namespace Node.Net
 {
     public struct Message
     {
+        private static readonly Dictionary<short, Type> Types = Assembly.GetExecutingAssembly().GetTypesWithAttribute();
+
         public Message(byte module, byte command, byte action)
         {
             this = new Message();
@@ -16,9 +21,10 @@ namespace Node.Net
             Command = command;
             Action = action;
             Data = new byte[0];
+            Contract = new TestContractClass();
         }
 
-        private const ushort HeaderSize = 8;
+        private const ushort HeaderSize = 10;
 
         public byte Version;
 
@@ -30,21 +36,28 @@ namespace Node.Net
 
         public byte[] Data;
 
+        public object Contract;
+
         public static async Task<Message> Deserialize(byte[] data, bool decompress = false)
         {
-            var length = BitConverter.ToInt32(data, 4);
-            var body = new byte[length];
-            Buffer.BlockCopy(data, HeaderSize, body, 0, length);
-
             var msg = new Message(data[1], data[2], data[3])
             {
                 Version = data[0],
-                Data = body
             };
+
+            var length = BitConverter.ToInt32(data, 6);
+            var body = new byte[length];
+            Buffer.BlockCopy(data, HeaderSize, body, 0, length);
 
             if (decompress)
             {
                 msg.Data = await Decompress(body);
+            }
+
+            var typeId = BitConverter.ToInt16(data, 4);
+            using (var ms = new MemoryStream(msg.Data))
+            {
+                msg.Contract = Serializer.Deserialize(Types[typeId], ms);
             }
 
             return msg;
@@ -52,22 +65,36 @@ namespace Node.Net
 
         public async Task<byte[]> Serialize(bool commpress = false)
         {
-            byte[] bytes;
-            using (var ms = new MemoryStream())
+            var bytes = new byte[0];
+            try
             {
-                ms.WriteByte(Version);
-                ms.WriteByte(Module);
-                ms.WriteByte(Command);
-                ms.WriteByte(Action);
-
-                if (commpress)
+                using (var ms = new MemoryStream())
                 {
-                    Data = await Compress(Data);
-                }
+                    ms.WriteByte(Version);
+                    ms.WriteByte(Module);
+                    ms.WriteByte(Command);
+                    ms.WriteByte(Action);
 
-                await ms.WriteAsync(BitConverter.GetBytes(Data.Length), 0, 4);
-                await ms.WriteAsync(Data, 0, Data.Length);
-                bytes = ms.ToArray();
+                    await ms.WriteAsync(BitConverter.GetBytes(Contract.GetTypeId()), 0, 2);
+                    using (var output = new MemoryStream())
+                    {
+                        Serializer.Serialize(output, Contract);
+                        Data = output.ToArray();
+                    }
+
+                    if (commpress)
+                    {
+                        Data = await Compress(Data);
+                    }
+
+                    await ms.WriteAsync(BitConverter.GetBytes(Data.Length), 0, 4);
+                    await ms.WriteAsync(Data, 0, Data.Length);
+                    bytes = ms.ToArray();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
             }
             return bytes;
         }
@@ -82,7 +109,7 @@ namespace Node.Net
                 count += stream.Read(header, count, HeaderSize - count);
             }
 
-            var length = BitConverter.ToInt32(header, 4);
+            var length = BitConverter.ToInt32(header, 6);
 
             var data = new byte[HeaderSize + length];
 

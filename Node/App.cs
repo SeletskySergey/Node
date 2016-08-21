@@ -1,14 +1,17 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Reflection;
 using System.Security;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
 using Node.Net;
+using ProtoBuf;
 
 namespace Node
 {
@@ -22,6 +25,8 @@ namespace Node
             var ip = Dns.GetHostEntry("127.0.0.1").AddressList.FirstOrDefault(x => x.AddressFamily == AddressFamily.InterNetwork);
             Local = new IPEndPoint(ip, 17777);
         }
+
+        
 
         private static void Main()
         {
@@ -38,8 +43,8 @@ namespace Node
             var cert = new X509Certificate2("cert.pfx", "Gagarin77$");
    
             var server = new NetServer(Local);
-            
-            server.Received += msg =>
+
+            server.Subscribe<TestContractClass>(msg =>
             {
                 if (count == 0)
                 {
@@ -49,12 +54,12 @@ namespace Node
                 if (count >= 10000)
                 {
                     watch.Stop();
-                    Console.WriteLine("Server {0:0 000} Msg / {2}Kb : {1} ms.", count, watch.ElapsedMilliseconds, msg.Data.Length/1024.0);
+                    Console.WriteLine("Server {0:0 000} Msg / {2}Kb : {1} ms.", count, watch.ElapsedMilliseconds, msg.Three.Length / 1024.0);
                     watch.Reset();
                     count = 0;
                 }
-                server.Send(Local, msg);
-            };
+                server.Publish(Local, msg);
+            });
 
             server.Disconnected += () => Console.WriteLine("Client is disconnected");
             server.Connected += () => Console.WriteLine("Client accepted!");
@@ -63,7 +68,7 @@ namespace Node
             server.Stopped += () => Console.WriteLine("Server stoped !");
             server.Start().Wait();
 
-            server.Send(Local, new Message(0, 0, 0) { Data = File.ReadAllBytes("Node.exe") }); //Init recursive sending
+            server.Publish(Local, new TestContractClass()); //Init recursive sending
             Console.ReadKey();
         }
 
@@ -81,7 +86,7 @@ namespace Node
 
             var client = new Node(Local);
 
-            client.Received += msg =>
+            client.Subscribe<TestContractClass>(msg =>
             {
                 if (count == 0)
                 {
@@ -91,12 +96,12 @@ namespace Node
                 if (count >= 10000)
                 {
                     watch.Stop();
-                    Console.WriteLine("Client {0:0 000} Msg / {2}Kb : {1} ms.", count, watch.ElapsedMilliseconds, msg.Data.Length/1024.0);
+                    Console.WriteLine("Client {0:0 000} Msg / {2}Kb : {1} ms.", count, watch.ElapsedMilliseconds, msg.Three.Length / 1024.0);
                     watch.Reset();
                     count = 0;
                 }
-                client.Send(msg);
-            };
+                client.Publish(msg);
+            });
 
             client.Disconnected += c =>
             {
@@ -110,7 +115,7 @@ namespace Node
 
             client.Start();
 
-            client.Send(new Message(0, 0, 0) { Data = File.ReadAllBytes("Node.exe") }); // Init recursive sending
+            client.Publish(new TestContractClass()); // Init recursive sending
         }
     }
 }

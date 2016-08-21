@@ -23,20 +23,15 @@ namespace Node.Net
             this.certificate = cert;
         }
 
-        public bool Send(IPEndPoint endpoint, Message msg)
+        public void Publish<T>(IPEndPoint endpoint, T instance)
         {
-            var client = Connections.FirstOrDefault(x => x.EndPoint.Address.Equals(endpoint.Address) && x.Connected);
-            if (client != null)
-            {
-                client.Send(msg);
-                return true;
-            }
-            return false;
+            var client = GetClient(endpoint);
+            client?.Publish(instance);
         }
 
-        public bool IsConnected(IPEndPoint endpoint)
+        private Node GetClient(IPEndPoint endpoint)
         {
-            return Connections.Any(a => a.EndPoint.Address.Equals(endpoint.Address) && a.Connected);
+            return Connections.FirstOrDefault(x => x.EndPoint.Address.Equals(endpoint.Address) && x.Connected);
         }
 
         public async Task Start()
@@ -49,7 +44,7 @@ namespace Node.Net
                 while (active)
                 {
                     var client =  new Node(await listener.AcceptTcpClientAsync(), certificate);
-                    client.Received += Received;
+                    client.Subscribe<object>(msg => Received(msg));
                     client.Disconnected += Disconnect;
                     client.Start();
                     Connections.Enqueue(client);
@@ -67,6 +62,17 @@ namespace Node.Net
             }
         }
 
+        public void Subscribe<T>(Action<T> action)
+        {
+            Received += msg =>
+            {
+                if (msg is T)
+                {
+                    Task.Run(() => action((T)msg));
+                }
+            };
+        }
+
         public void Stop()
         {
             active = false;
@@ -80,7 +86,7 @@ namespace Node.Net
             Disconnected();
         }
 
-        public event Action<Message> Received = msg => { };
+        private event Action<object> Received = msg => { };
         public event Action Disconnected = () => { };
         public event Action Connected = () => { };
         public event Action Started = () => { };
