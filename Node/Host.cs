@@ -11,15 +11,13 @@ namespace Node
     public sealed class Host
     {
         public readonly ConcurrentDictionary<IPAddress, Node> Nodes = new ConcurrentDictionary<IPAddress, Node>();
-        private readonly X509Certificate2 certificate;
         private readonly TcpListener listener;
 
         private bool active;
 
-        public Host(IPEndPoint endpoint, X509Certificate2 cert = null)
+        public Host(IPEndPoint endpoint)
         {
             listener = new TcpListener(endpoint);
-            certificate = cert;
         }
 
         public void Publish<T>(IPEndPoint endpoint, T instance)
@@ -27,7 +25,7 @@ namespace Node
             Nodes[endpoint.Address]?.Publish(instance);
         }
 
-        public async Task Start()
+        public void Start()
         {
             active = true;
             try
@@ -36,7 +34,7 @@ namespace Node
                 Started();
                 while (active)
                 {
-                    var client =  new Node(await listener.AcceptTcpClientAsync(), certificate);
+                    var client =  new Node(listener.AcceptTcpClient());
                     client.Subscribe<object>(msg => Received(msg));
                     client.Disconnected += Disconnect;
                     client.Start();

@@ -1,18 +1,13 @@
 ﻿using System;
 using System.IO;
-using System.Linq;
 using System.Net;
-using System.Net.Security;
 using System.Net.Sockets;
-using System.Security.Authentication;
-using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
 
 namespace Node
 {
     public sealed class Node
     {
-        private readonly X509Certificate2 certificate;
         private bool active;
         private TcpClient client;
         private Task receiver;
@@ -20,17 +15,15 @@ namespace Node
 
         public IPEndPoint EndPoint { get; set; }
 
-        public Node(IPEndPoint endPoint, X509Certificate2 cert = null)
+        public Node(IPEndPoint endPoint)
         {
-            certificate = cert;
             EndPoint = endPoint;
             client = new TcpClient();
             receiver = new Task(Receiver);
         }
 
-        public Node(TcpClient client, X509Certificate2 cert = null)
+        public Node(TcpClient client)
         {
-            certificate = cert;
             this.client = client;
             EndPoint = (IPEndPoint)client.Client.RemoteEndPoint;
             receiver = new Task(Receiver);
@@ -78,23 +71,9 @@ namespace Node
                 {
                     client = new TcpClient();
                     client.Connect(EndPoint);
-                    if (certificate != null)
-                    {
-                        stream = CreateClientNetworkStream();
-                    }
-                }
-                else
-                {
-                    if (certificate != null)
-                    {
-                        stream = CreateServerNetworkStream();
-                    }
                 }
 
-                if (certificate == null)
-                {
-                    stream = CreateNetworkStream();
-                }
+                stream = CreateNetworkStream();
 
                 if (receiver.Status == TaskStatus.Created)
                 {
@@ -111,28 +90,6 @@ namespace Node
         private Stream CreateNetworkStream()
         {
             return client.GetStream();
-        }
-
-        private Stream CreateClientNetworkStream()
-        {
-            var sslStream = new SslStream(client.GetStream(), false, RemoteCertificateValidation, LocalCertificateSelection, EncryptionPolicy.RequireEncryption);
-            sslStream.AuthenticateAsClient(EndPoint.Address.ToString(), new X509CertificateCollection(new X509Certificate[] { certificate }), SslProtocols.Default, true);
-            sslStream.DisplaySecurityLevel();
-            sslStream.DisplaySecurityServices();
-            sslStream.DisplayCertificateInformation();
-            sslStream.DisplayStreamProperties();
-            return sslStream;
-        }
-
-        private Stream CreateServerNetworkStream()
-        {
-            var sslStream = new SslStream(client.GetStream(), false, RemoteCertificateValidation, LocalCertificateSelection, EncryptionPolicy.RequireEncryption);
-            sslStream.AuthenticateAsServer(certificate, true, SslProtocols.Default, true);
-            sslStream.DisplaySecurityLevel();
-            sslStream.DisplaySecurityServices();
-            sslStream.DisplayCertificateInformation();
-            sslStream.DisplayStreamProperties();
-            return sslStream;
         }
 
         public void Publish<T>(T instance)
@@ -163,23 +120,6 @@ namespace Node
 
         private event Action<Message> Received = msg => { };
         public event Action<Node> Disconnected = client => { };
-
-        public event RemoteCertificateValidationCallback RemoteCertificateValidation = (sender, certificate, chain, sslPolicyErrors) =>
-        {
-            return true;
-            if (sslPolicyErrors == SslPolicyErrors.None)
-                return true;
-
-            Console.WriteLine("Certificate error: {0}", sslPolicyErrors);
-
-            // Do not allow this client to communicate with unauthenticated servers.
-            return false;
-        };
-
-        public event LocalCertificateSelectionCallback LocalCertificateSelection = (sender, targetHost, localCertificates, remoteCertificate, acceptableIssuers) =>
-        {
-            return localCertificates.Cast<X509Certificate>().FirstOrDefault();
-        };
     }
 }
 

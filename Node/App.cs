@@ -3,7 +3,6 @@ using System.Diagnostics;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
-using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -31,8 +30,6 @@ namespace Node
             var count = 0;
             var watch = new Stopwatch();
 
-            var cert = new X509Certificate2("cert.pfx", "Gagarin77$");
-   
             var server = new Host(Local);
 
             server.Subscribe<TestContractClass>(msg =>
@@ -57,7 +54,7 @@ namespace Node
             server.Started += () => Console.WriteLine("Waiting for a connection...");
             server.Error += ex => Console.WriteLine(ex.Message);
             server.Stopped += () => Console.WriteLine("Server stoped !");
-            server.Start().Wait();
+            server.Start();
 
             server.Publish(Local, new TestContractClass()); //Init recursive sending
             Console.ReadKey();
@@ -69,11 +66,6 @@ namespace Node
             var watch = new Stopwatch();
 
             Console.ForegroundColor = ConsoleColor.Green;
-
-            var store = new X509Store(StoreName.My, StoreLocation.CurrentUser);
-            store.Open(OpenFlags.ReadOnly);
-            X509CertificateCollection certs = store.Certificates.Find(X509FindType.FindBySubjectName, "Sergey Seletsky", true);
-            var cert = certs.Cast<X509Certificate2>().FirstOrDefault();
 
             var client = new Node(Local);
 
