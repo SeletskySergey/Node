@@ -3,7 +3,7 @@ using ProtoBuf;
 
 namespace Node
 {
-    [ProtoContract, ProtoNav(19)]
+    [ProtoContract]
     public class TestContractClass
     {
         [ProtoMember(1)]

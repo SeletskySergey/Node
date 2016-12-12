@@ -1,11 +1,16 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Reflection;
 using ProtoBuf;
 
 namespace Node
 {
     public class Message
     {
+        private static readonly Dictionary<int, Type> types = new Dictionary<int, Type>();
+
         public Message(byte module, byte command, byte action)
         {
             Version = 0;
@@ -16,7 +21,7 @@ namespace Node
             Contract = new TestContractClass();
         }
 
-        private const ushort HeaderSize = 10;
+        private const ushort HeaderSize = 12;
 
         public byte Version;
 
@@ -37,14 +42,21 @@ namespace Node
                 Version = data[0],
             };
 
-            var length = BitConverter.ToInt32(data, 6);
+            var length = BitConverter.ToInt32(data, 8);
             var body = new byte[length];
             Buffer.BlockCopy(data, HeaderSize, body, 0, length);
 
-            var typeId = BitConverter.ToInt16(data, 4);
+            var typeId = BitConverter.ToInt32(data, 4);
             using (var ms = new MemoryStream(msg.Data))
             {
-                msg.Contract = Serializer.Deserialize(TypeNavigator.GetTypeById(typeId), ms);
+                if (!types.ContainsKey(typeId))
+                {
+                    //Improve
+                    var val = Assembly.GetEntryAssembly().GetTypes().Single(f => f.Name.GetHashCode() == typeId);
+                    types.Add(typeId, val);
+                }
+                
+                msg.Contract = Serializer.Deserialize(types[typeId], ms);
             }
 
             return msg;
@@ -62,7 +74,7 @@ namespace Node
                     ms.WriteByte(Command);
                     ms.WriteByte(Action);
 
-                    ms.Write(BitConverter.GetBytes(Contract.GetTypeId()), 0, 2);
+                    ms.Write(BitConverter.GetBytes(Contract.GetType().Name.GetHashCode()), 0, 4);
                     using (var output = new MemoryStream())
                     {
                         Serializer.Serialize(output, Contract);
@@ -91,7 +103,7 @@ namespace Node
                 count += stream.Read(header, count, HeaderSize - count);
             }
 
-            var length = BitConverter.ToInt32(header, 6);
+            var length = BitConverter.ToInt32(header, 8);
 
             var data = new byte[HeaderSize + length];
 
