@@ -30,7 +30,7 @@ namespace Node
 
         public object Contract;
 
-        public static Message Deserialize(byte[] data, bool decompress = false)
+        public static Message Deserialize(byte[] data)
         {
             var msg = new Message(data[1], data[2], data[3])
             {
@@ -50,7 +50,7 @@ namespace Node
             return msg;
         }
 
-        public byte[] Serialize(bool commpress = false)
+        public byte[] Serialize()
         {
             var bytes = new byte[0];
             try
