@@ -24,13 +24,7 @@ namespace Node
 
         public void Publish<T>(IPEndPoint endpoint, T instance)
         {
-            var client = GetClient(endpoint);
-            client?.Publish(instance);
-        }
-
-        private Node GetClient(IPEndPoint endpoint)
-        {
-            return Nodes[endpoint.Address];
+            Nodes[endpoint.Address]?.Publish(instance);
         }
 
         public async Task Start()

@@ -115,24 +115,24 @@ namespace Node
 
         private Stream CreateClientNetworkStream()
         {
-            var stream = new SslStream(client.GetStream(), false, RemoteCertificateValidation, LocalCertificateSelection, EncryptionPolicy.RequireEncryption);
-            stream.AuthenticateAsClient(EndPoint.Address.ToString(), new X509CertificateCollection(new[] { certificate }), SslProtocols.Default, true);
-            stream.DisplaySecurityLevel();
-            stream.DisplaySecurityServices();
-            stream.DisplayCertificateInformation();
-            stream.DisplayStreamProperties();
-            return stream;
+            var sslStream = new SslStream(client.GetStream(), false, RemoteCertificateValidation, LocalCertificateSelection, EncryptionPolicy.RequireEncryption);
+            sslStream.AuthenticateAsClient(EndPoint.Address.ToString(), new X509CertificateCollection(new X509Certificate[] { certificate }), SslProtocols.Default, true);
+            sslStream.DisplaySecurityLevel();
+            sslStream.DisplaySecurityServices();
+            sslStream.DisplayCertificateInformation();
+            sslStream.DisplayStreamProperties();
+            return sslStream;
         }
 
         private Stream CreateServerNetworkStream()
         {
-            var stream = new SslStream(client.GetStream(), false, RemoteCertificateValidation, LocalCertificateSelection, EncryptionPolicy.RequireEncryption);
-            stream.AuthenticateAsServer(certificate, true, SslProtocols.Default, true);
-            stream.DisplaySecurityLevel();
-            stream.DisplaySecurityServices();
-            stream.DisplayCertificateInformation();
-            stream.DisplayStreamProperties();
-            return stream;
+            var sslStream = new SslStream(client.GetStream(), false, RemoteCertificateValidation, LocalCertificateSelection, EncryptionPolicy.RequireEncryption);
+            sslStream.AuthenticateAsServer(certificate, true, SslProtocols.Default, true);
+            sslStream.DisplaySecurityLevel();
+            sslStream.DisplaySecurityServices();
+            sslStream.DisplayCertificateInformation();
+            sslStream.DisplayStreamProperties();
+            return sslStream;
         }
 
         public void Publish<T>(T instance)
@@ -147,7 +147,7 @@ namespace Node
             {
                 if (msg.Contract is T)
                 {
-                    Task.Run(() => action((T)msg.Contract));
+                    action((T)msg.Contract);
                 }
             };
         }
