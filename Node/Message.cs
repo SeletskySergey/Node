@@ -4,11 +4,10 @@ using ProtoBuf;
 
 namespace Node
 {
-    public struct Message
+    public class Message
     {
         public Message(byte module, byte command, byte action)
         {
-            this = new Message();
             Version = 0;
             Module = module;
             Command = command;
