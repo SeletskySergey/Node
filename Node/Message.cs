@@ -1,6 +1,5 @@
 ﻿using System;
 using System.IO;
-using System.IO.Compression;
 using ProtoBuf;
 
 namespace Node
@@ -43,11 +42,6 @@ namespace Node
             var body = new byte[length];
             Buffer.BlockCopy(data, HeaderSize, body, 0, length);
 
-            if (decompress)
-            {
-                msg.Data = Decompress(body);
-            }
-
             var typeId = BitConverter.ToInt16(data, 4);
             using (var ms = new MemoryStream(msg.Data))
             {
@@ -74,11 +68,6 @@ namespace Node
                     {
                         Serializer.Serialize(output, Contract);
                         Data = output.ToArray();
-                    }
-
-                    if (commpress)
-                    {
-                        Data = Compress(Data);
                     }
 
                     ms.Write(BitConverter.GetBytes(Data.Length), 0, 4);
@@ -117,33 +106,6 @@ namespace Node
                 }
             }
             return data;
-        }
-
-        private static byte[] Compress(byte[] bytes)
-        {
-            using (var destination = new MemoryStream())
-            {
-                using (var output = new GZipStream(destination, CompressionMode.Compress))
-                {
-                    output.Write(bytes, 0, bytes.Length);
-                }
-                return destination.ToArray();
-            }
-        }
-
-        private static byte[] Decompress(byte[] bytes)
-        {
-            using (var source = new MemoryStream(bytes))
-            {
-                using (var input = new GZipStream(source, CompressionMode.Decompress))
-                {
-                    using (var output = new MemoryStream())
-                    {
-                        input.CopyTo(output);
-                        return output.ToArray();
-                    }    
-                }
-            }
         }
     }
 }
