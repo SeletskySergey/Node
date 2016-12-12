@@ -1,16 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Node
 {
     public static class TypeNavigator
     {
-        private static readonly Dictionary<Type, short> TypeToIdCache = new Dictionary<Type, short>();
-        private static readonly Dictionary<short, Type> IdToTypeCache = new Dictionary<short, Type>();
+        private static readonly Dictionary<Type, short> typeToIdCache = new Dictionary<Type, short>();
+        private static readonly Dictionary<short, Type> idToTypeCache = new Dictionary<short, Type>();
 
         static TypeNavigator()
         {
@@ -19,36 +16,36 @@ namespace Node
                 if (type.GetCustomAttributes(typeof(ProtoNavAttribute), true).Length > 0)
                 {
                     var attr = type.GetCustomAttribute<ProtoNavAttribute>();
-                    IdToTypeCache.Add(attr.ContractTypeId, type);
-                    TypeToIdCache.Add(type, attr.ContractTypeId);
+                    idToTypeCache.Add(attr.ContractTypeId, type);
+                    typeToIdCache.Add(type, attr.ContractTypeId);
                 }
             }
         }
 
         public static Dictionary<short, Type> GetTypesWithAttribute()
         {
-            return IdToTypeCache;
+            return idToTypeCache;
         }
 
         
         public static short GetTypeId(this object obj)
         {
             var type = obj.GetType();
-            if (TypeToIdCache.ContainsKey(type))
+            if (typeToIdCache.ContainsKey(type))
             {
-                return TypeToIdCache[type];
+                return typeToIdCache[type];
             }
             else
             {
                 var id = type.GetCustomAttribute<ProtoNavAttribute>().ContractTypeId;
-                TypeToIdCache.Add(type, id);
+                typeToIdCache.Add(type, id);
                 return id;
             }
         }
 
         public static Type GetTypeById(short id)
         {
-            return IdToTypeCache[id];
+            return idToTypeCache[id];
         }
     }
 }

@@ -10,12 +10,12 @@ namespace Node
 {
     internal class App
     {
-        private static readonly IPEndPoint Local;
+        private static readonly IPEndPoint local;
 
         static App()
         {
-            var ip = Dns.GetHostEntry("127.0.0.1").AddressList.FirstOrDefault(x => x.AddressFamily == AddressFamily.InterNetwork);
-            Local = new IPEndPoint(ip, 17777);
+            var ip = Dns.GetHostEntry("127.0.0.1").AddressList.First(x => x.AddressFamily == AddressFamily.InterNetwork);
+            local = new IPEndPoint(ip, 17777);
         }
 
         private static void Main()
@@ -30,7 +30,7 @@ namespace Node
             var count = 0;
             var watch = new Stopwatch();
 
-            var server = new Host(Local);
+            var server = new Host(local);
 
             server.Subscribe<TestContractClass>(msg =>
             {
@@ -46,7 +46,7 @@ namespace Node
                     watch.Reset();
                     count = 0;
                 }
-                server.Publish(Local, msg);
+                server.Publish(local, msg);
             });
 
             server.Disconnected += () => Console.WriteLine("Client is disconnected");
@@ -56,7 +56,7 @@ namespace Node
             server.Stopped += () => Console.WriteLine("Server stoped !");
             server.Start();
 
-            server.Publish(Local, new TestContractClass()); //Init recursive sending
+            server.Publish(local, new TestContractClass()); //Init recursive sending
             Console.ReadKey();
         }
 
@@ -67,7 +67,7 @@ namespace Node
 
             Console.ForegroundColor = ConsoleColor.Green;
 
-            var client = new Node(Local);
+            var client = new Node(local);
 
             client.Subscribe<TestContractClass>(msg =>
             {

@@ -1,16 +1,13 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Replicator
 {
     class Program
     {
-        static void Main(string[] args)
+        static void Main()
         {
             var arr = File.ReadAllLines("words.txt").OrderBy(f => f).ToList();
 
