@@ -3,7 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using ProtoBuf;
+using System.Text;
+using Newtonsoft.Json;
 
 namespace Node
 {
@@ -43,21 +44,19 @@ namespace Node
             };
 
             var length = BitConverter.ToInt32(data, 8);
-            var body = new byte[length];
-            Buffer.BlockCopy(data, HeaderSize, body, 0, length);
+            msg.Data = new byte[length];
+            Buffer.BlockCopy(data, HeaderSize, msg.Data, 0, length);
 
             var typeId = BitConverter.ToInt32(data, 4);
-            using (var ms = new MemoryStream(msg.Data))
+            if (!types.ContainsKey(typeId))
             {
-                if (!types.ContainsKey(typeId))
-                {
-                    //Improve
-                    var val = Assembly.GetEntryAssembly().GetTypes().Single(f => f.Name.GetHashCode() == typeId);
-                    types.Add(typeId, val);
-                }
-                
-                msg.Contract = Serializer.Deserialize(types[typeId], ms);
+                //Improve
+                var val = Assembly.GetEntryAssembly().GetTypes().Single(f => f.Name.GetHashCode() == typeId);
+                types.Add(typeId, val);
             }
+
+            var json = Encoding.Default.GetString(msg.Data);
+            msg.Contract = JsonConvert.DeserializeObject(json, types[typeId]);
 
             return msg;
         }
@@ -75,11 +74,9 @@ namespace Node
                     ms.WriteByte(Action);
 
                     ms.Write(BitConverter.GetBytes(Contract.GetType().Name.GetHashCode()), 0, 4);
-                    using (var output = new MemoryStream())
-                    {
-                        Serializer.Serialize(output, Contract);
-                        Data = output.ToArray();
-                    }
+
+                    var json = JsonConvert.SerializeObject(Contract);
+                    Data = Encoding.Default.GetBytes(json);
 
                     ms.Write(BitConverter.GetBytes(Data.Length), 0, 4);
                     ms.Write(Data, 0, Data.Length);
