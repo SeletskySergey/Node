@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.IO;
-using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography.X509Certificates;
@@ -11,7 +10,7 @@ namespace Node
 {
     public sealed class Host
     {
-        public readonly ConcurrentQueue<Node> Connections = new ConcurrentQueue<Node>();
+        public readonly ConcurrentDictionary<IPAddress, Node> Nodes = new ConcurrentDictionary<IPAddress, Node>();
         private readonly X509Certificate2 certificate;
         private readonly TcpListener listener;
 
@@ -31,7 +30,7 @@ namespace Node
 
         private Node GetClient(IPEndPoint endpoint)
         {
-            return Connections.FirstOrDefault(x => x.EndPoint.Address.Equals(endpoint.Address) && x.Connected);
+            return Nodes[endpoint.Address];
         }
 
         public async Task Start()
@@ -47,8 +46,11 @@ namespace Node
                     client.Subscribe<object>(msg => Received(msg));
                     client.Disconnected += Disconnect;
                     client.Start();
-                    Connections.Enqueue(client);
-                    Connected();
+                    var added = Nodes.TryAdd(client.EndPoint.Address, client);
+                    if (added)
+                    {
+                        Connected();
+                    }
                 }
             }
             catch (IOException ex)
@@ -76,14 +78,17 @@ namespace Node
         public void Stop()
         {
             active = false;
-            Connections.TakeWhile(x => true);
+            Nodes.Clear();
             Stopped();
         }
 
         private void Disconnect(Node client)
         {
-            Connections.TryDequeue(out client);
-            Disconnected();
+            var removed = Nodes.TryRemove(client.EndPoint.Address, out client);
+            if (removed)
+            {
+                Disconnected();
+            }
         }
 
         private event Action<object> Received = msg => { };
