@@ -20,7 +20,7 @@ namespace Node
         public Host(IPEndPoint endpoint, X509Certificate2 cert = null)
         {
             listener = new TcpListener(endpoint);
-            this.certificate = cert;
+            certificate = cert;
         }
 
         public void Publish<T>(IPEndPoint endpoint, T instance)
@@ -68,7 +68,7 @@ namespace Node
             {
                 if (msg is T)
                 {
-                    Task.Run(() => action((T)msg));
+                    action((T)msg);
                 }
             };
         }
