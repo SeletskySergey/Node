@@ -46,7 +46,7 @@ namespace Node
                     watch.Reset();
                     count = 0;
                 }
-                server.Publish(local, msg);
+                server.Publish(local.Address, msg);
             });
 
             server.Disconnected += () => Console.WriteLine("Client is disconnected");
@@ -56,7 +56,7 @@ namespace Node
             server.Stopped += () => Console.WriteLine("Server stoped !");
             server.Start();
 
-            server.Publish(local, new TestContractClass()); //Init recursive sending
+            server.Publish(local.Address, new TestContractClass()); //Init recursive sending
             Console.ReadKey();
         }
 

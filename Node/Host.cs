@@ -18,9 +18,9 @@ namespace Node
             listener = new TcpListener(endpoint);
         }
 
-        public void Publish<T>(IPEndPoint endpoint, T instance)
+        public void Publish<T>(IPAddress address, T instance)
         {
-            Nodes[endpoint.Address]?.Publish(instance);
+            Nodes[address]?.Publish(instance);
         }
 
         public void Start()
