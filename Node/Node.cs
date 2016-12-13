@@ -104,7 +104,7 @@ namespace Node
             {
                 if (msg.Contract is T)
                 {
-                    action((T)msg.Contract);
+                    Task.Run(() => action((T)msg.Contract));
                 }
             };
         }
