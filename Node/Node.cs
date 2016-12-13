@@ -9,8 +9,8 @@ namespace Node
     public sealed class Node
     {
         private bool active;
-        private TcpClient client;
-        private Task receiver;
+        private readonly TcpClient client;
+        private readonly Task receiver;
         private Stream stream;
 
         public IPEndPoint EndPoint { get; set; }
@@ -72,15 +72,13 @@ namespace Node
                 active = true;
                 if (!Connected)
                 {
-                    client = new TcpClient();
                     client.Connect(EndPoint);
                 }
 
-                stream = CreateNetworkStream();
+                stream = client.GetStream();
 
                 if (receiver.Status == TaskStatus.Created)
                 {
-                    receiver = new Task(Receiver);
                     receiver.Start();
                 }
             }
@@ -88,11 +86,6 @@ namespace Node
             {
                 Disconnect();
             }
-        }
-
-        private Stream CreateNetworkStream()
-        {
-            return client.GetStream();
         }
 
         public void Publish<T>(T instance)
