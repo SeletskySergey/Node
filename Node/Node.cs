@@ -52,8 +52,11 @@ namespace Node
                 try
                 {
                     var data = Message.Get(stream);
-                    var msg = Message.Deserialize(data);
-                    Received(msg);
+                    Task.Run(() =>
+                    {
+                        var msg = Message.Deserialize(data);
+                        Received(msg);
+                    });
                 }
                 catch (IOException)
                 {
@@ -104,7 +107,7 @@ namespace Node
             {
                 if (msg.Contract is T)
                 {
-                    Task.Run(() => action((T)msg.Contract));
+                    action((T)msg.Contract);
                 }
             };
         }
