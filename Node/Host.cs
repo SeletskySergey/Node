@@ -8,7 +8,7 @@ namespace Node
 {
     public sealed class Host
     {
-        public readonly ConcurrentDictionary<IPAddress, Node> Nodes = new ConcurrentDictionary<IPAddress, Node>();
+        private readonly ConcurrentDictionary<IPAddress, Node> nodes = new ConcurrentDictionary<IPAddress, Node>();
         private readonly TcpListener listener;
 
         private bool active;
@@ -20,7 +20,7 @@ namespace Node
 
         public void Publish<T>(IPAddress address, T instance)
         {
-            Nodes[address]?.Publish(instance);
+            nodes[address]?.Publish(instance);
         }
 
         public void Start()
@@ -36,7 +36,7 @@ namespace Node
                     client.Subscribe<object>(msg => Received(msg));
                     client.Disconnected += Disconnect;
                     client.Start();
-                    var added = Nodes.TryAdd(client.EndPoint.Address, client);
+                    var added = nodes.TryAdd(client.EndPoint.Address, client);
                     if (added)
                     {
                         Connected();
@@ -68,13 +68,13 @@ namespace Node
         public void Stop()
         {
             active = false;
-            Nodes.Clear();
+            nodes.Clear();
             Stopped();
         }
 
         private void Disconnect(Node client)
         {
-            var removed = Nodes.TryRemove(client.EndPoint.Address, out client);
+            var removed = nodes.TryRemove(client.EndPoint.Address, out client);
             if (removed)
             {
                 Disconnected();
