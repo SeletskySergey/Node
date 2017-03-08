@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using Newtonsoft.Json;
+using ProtoBuf;
 
 namespace Node
 {
@@ -56,8 +57,16 @@ namespace Node
                 types.Add(typeId, val);
             }
 
-            var json = Encoding.UTF8.GetString(msg.Data);
-            msg.Contract = JsonConvert.DeserializeObject(json, types[typeId]);
+            msg.Contract = TestContractClass.Deserialize(msg.Data);
+
+            //using (var ms = new MemoryStream(msg.Data))
+            //{
+            //    msg.Contract = Serializer.Deserialize(typeof(TestContractClass), ms);
+            //}
+
+
+            //var json = Encoding.UTF8.GetString(msg.Data);
+            //msg.Contract = JsonConvert.DeserializeObject(json, types[typeId]);
 
             return msg;
         }
@@ -68,8 +77,16 @@ namespace Node
         /// <returns>Serialized buffer</returns>
         public byte[] Serialize()
         {
-            var json = JsonConvert.SerializeObject(Contract);
-            Data = Encoding.UTF8.GetBytes(json);
+            Data = ((TestContractClass)Contract).Serialize();
+
+            //using (var ms = new MemoryStream())
+            //{
+            //    Serializer.Serialize(ms, Contract);
+            //    Data = ms.ToArray();
+            //}
+
+            //var json = JsonConvert.SerializeObject(Contract);
+            //Data = Encoding.UTF8.GetBytes(json);
 
             var buffer = new byte[HeaderSize + Data.Length];
 

@@ -52,11 +52,8 @@ namespace Node
                 try
                 {
                     var data = Message.Get(stream);
-                    Task.Run(() =>
-                    {
-                        var msg = Message.Deserialize(data);
-                        Received(msg);
-                    });
+                    var msg = Message.Deserialize(data);
+                    Received(msg);
                 }
                 catch (IOException)
                 {
