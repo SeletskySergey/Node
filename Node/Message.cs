@@ -44,6 +44,7 @@ namespace Node
             };
 
             var length = BitConverter.ToInt32(data, 8);
+
             msg.Data = new byte[length];
             Buffer.BlockCopy(data, HeaderSize, msg.Data, 0, length);
 
@@ -55,41 +56,46 @@ namespace Node
                 types.Add(typeId, val);
             }
 
-            var json = Encoding.Default.GetString(msg.Data);
+            var json = Encoding.UTF8.GetString(msg.Data);
             msg.Contract = JsonConvert.DeserializeObject(json, types[typeId]);
 
             return msg;
         }
 
+        /// <summary>
+        /// Serialize message
+        /// </summary>
+        /// <returns>Serialized buffer</returns>
         public byte[] Serialize()
         {
-            var bytes = new byte[0];
-            try
-            {
-                using (var ms = new MemoryStream())
-                {
-                    ms.WriteByte(Version);
-                    ms.WriteByte(Module);
-                    ms.WriteByte(Command);
-                    ms.WriteByte(Action);
+            var json = JsonConvert.SerializeObject(Contract);
+            Data = Encoding.UTF8.GetBytes(json);
 
-                    ms.Write(BitConverter.GetBytes(Contract.GetType().Name.GetHashCode()), 0, 4);
+            var buffer = new byte[HeaderSize + Data.Length];
 
-                    var json = JsonConvert.SerializeObject(Contract);
-                    Data = Encoding.Default.GetBytes(json);
+            Buffer.SetByte(buffer, 0, Version);
+            Buffer.SetByte(buffer, 1, Module);
+            Buffer.SetByte(buffer, 2, Command);
+            Buffer.SetByte(buffer, 3, Action);
 
-                    ms.Write(BitConverter.GetBytes(Data.Length), 0, 4);
-                    ms.Write(Data, 0, Data.Length);
-                    bytes = ms.ToArray();
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex.Message);
-            }
-            return bytes;
+            var hash = BitConverter.GetBytes(Contract.GetType().Name.GetHashCode());
+
+            Buffer.BlockCopy(hash, 0, buffer, 4, hash.Length);
+
+            var length = BitConverter.GetBytes(Data.Length);
+
+            Buffer.BlockCopy(length, 0, buffer, 8, length.Length);
+
+            Buffer.BlockCopy(Data, 0, buffer, 12, Data.Length);
+
+            return buffer;
         }
 
+        /// <summary>
+        /// Get full message buffer from stream
+        /// </summary>
+        /// <param name="stream">Source stream</param>
+        /// <returns>Message buffer</returns>
         public static byte[] Get(Stream stream)
         {
             var header = new byte[HeaderSize];

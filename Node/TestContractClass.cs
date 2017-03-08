@@ -9,5 +9,7 @@ namespace Node
         public DateTime Two { set; get; } = DateTime.Now;
 
         public byte[] Three { set; get; } = new byte[1024];
+
+        public long Count { set; get; } = 123456;
     }
 }
