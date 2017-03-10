@@ -57,12 +57,10 @@ namespace Node
                 types.Add(typeId, val);
             }
 
-            msg.Contract = TestContractClass.Deserialize(msg.Data);
-
-            //using (var ms = new MemoryStream(msg.Data))
-            //{
-            //    msg.Contract = Serializer.Deserialize(typeof(TestContractClass), ms);
-            //}
+            using (var ms = new MemoryStream(msg.Data))
+            {
+                msg.Contract = Serializer.Deserialize(typeof(TestContractClass), ms);
+            }
 
 
             //var json = Encoding.UTF8.GetString(msg.Data);
@@ -77,13 +75,11 @@ namespace Node
         /// <returns>Serialized buffer</returns>
         public byte[] Serialize()
         {
-            Data = ((TestContractClass)Contract).Serialize();
-
-            //using (var ms = new MemoryStream())
-            //{
-            //    Serializer.Serialize(ms, Contract);
-            //    Data = ms.ToArray();
-            //}
+            using (var ms = new MemoryStream())
+            {
+                Serializer.Serialize(ms, Contract);
+                Data = ms.ToArray();
+            }
 
             //var json = JsonConvert.SerializeObject(Contract);
             //Data = Encoding.UTF8.GetBytes(json);

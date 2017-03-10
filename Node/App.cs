@@ -17,6 +17,89 @@ namespace Node
 {
     internal class App
     {
+        public static void JsonTest(int count)
+        {
+            var sw = Stopwatch.StartNew();
+            for (var i = 0; i < count; i++)
+            {
+                var x = JsonConvert.SerializeObject(instance);
+                var bytes = Encoding.UTF8.GetBytes(x);
+            }
+            sw.Stop();
+            Console.WriteLine($"JSON Serialize: {sw.ElapsedMilliseconds} ms.");
+
+            var json = JsonConvert.SerializeObject(instance);
+            var l1 = Encoding.UTF8.GetBytes(json);
+            Console.WriteLine($"JSON Size: {l1.Length} bytes.");
+
+            sw.Restart();
+            for (var i = 0; i < count; i++)
+            {
+                var x = JsonConvert.DeserializeObject(json, typeof(TestContractClass));
+            }
+            sw.Stop();
+            Console.WriteLine($"JSON Deserialize: {sw.ElapsedMilliseconds} ms.\n");
+        }
+
+        public static void ProtoTest(int count)
+        {
+            var sw = Stopwatch.StartNew();
+            for (var i = 0; i < count; i++)
+            {
+                using (var ms = new MemoryStream())
+                {
+                    Serializer.Serialize(ms, instance);
+                    var bytes = ms.ToArray();
+                }
+            }
+            sw.Stop();
+            Console.WriteLine($"PROTO Serialize: {sw.ElapsedMilliseconds} ms.");
+
+
+            byte[] data;
+            using (var ms = new MemoryStream())
+            {
+                Serializer.Serialize(ms, instance);
+                data = ms.ToArray();
+            }
+            Console.WriteLine($"PROTO Size: {data.Length} bytes.");
+
+            sw.Start();
+            for (var i = 0; i < count; i++)
+            {
+                using (var ms = new MemoryStream(data))
+                {
+                    var o = Serializer.Deserialize(typeof(TestContractClass), ms);
+                }
+            }
+            sw.Stop();
+            Console.WriteLine($"PROTO Deserialize: {sw.ElapsedMilliseconds} ms.\n");
+        }
+
+        public static void NanoTest(int count)
+        {
+            var model = instance.Build();
+
+            var sw = Stopwatch.StartNew();
+            for (var i = 0; i < count; i++)
+            {
+                var bytes = model.Serialize(instance);
+            }
+            sw.Stop();
+            Console.WriteLine($"NANO Serialize: {sw.ElapsedMilliseconds} ms.");
+
+            byte[] data5 = model.Serialize(instance);
+
+            Console.WriteLine($"NANO Size: {data5.Length} bytes.");
+            sw.Start();
+            for (var i = 0; i < count; i++)
+            {
+                var cls = model.Deserialize(data5);
+            }
+            sw.Stop();
+            Console.WriteLine($"NANO Deserialize: {sw.ElapsedMilliseconds} ms.\n");
+        }
+
         private static readonly IPEndPoint local;
 
         static App()
@@ -43,91 +126,14 @@ namespace Node
             RuntimeTypeModel.Default.Add(typeof(TestContractClass), true);
             RuntimeTypeModel.Default.CompileInPlace();
 
-            var sw = new Stopwatch();
             var count = 100000;
 
-            //sw.Start();
-            //for (var i = 0; i < count; i++)
-            //{
-            //    var x = JsonConvert.SerializeObject(instance);
-            //    var bytes = Encoding.UTF8.GetBytes(x);
-            //}
-            //sw.Stop();
-            //Console.WriteLine($"JSON Serialize: {sw.ElapsedMilliseconds} ms.");
+            //JsonTest(count);
+            ProtoTest(count);
+            NanoTest(count);
 
-            //var json = JsonConvert.SerializeObject(instance);
-            //var l1 = Encoding.UTF8.GetBytes(json);
-            //Console.WriteLine($"JSON Size: {l1.Length} bytes.");
-
-            //sw.Restart();
-            //for (var i = 0; i < count; i++)
-            //{
-            //    var x = JsonConvert.DeserializeObject(json, typeof(TestContractClass));
-            //}
-            //sw.Stop();
-            //Console.WriteLine($"JSON Deserialize: {sw.ElapsedMilliseconds} ms.");
-
-            /////////////////////////////////////////////////////
-
-
-
-            //sw.Start();
-            //for (var i = 0; i < count; i++)
-            //{
-            //    using (var ms = new MemoryStream())
-            //    {
-            //        Serializer.Serialize(ms, instance);
-            //        var bytes = ms.ToArray();
-            //    }
-            //}
-            //sw.Stop();
-            //Console.WriteLine($"PROTO Serialize: {sw.ElapsedMilliseconds} ms.");
-
-
-            //byte[] data;
-            //using (var ms = new MemoryStream())
-            //{
-            //    Serializer.Serialize(ms, instance);
-            //    data = ms.ToArray();
-            //}
-            //Console.WriteLine($"PROTO Size: {data.Length} bytes.");
-
-            //sw.Start();
-            //for (var i = 0; i < count; i++)
-            //{
-            //    using (var ms = new MemoryStream(data))
-            //    {
-            //        var o = Serializer.Deserialize(typeof(TestContractClass), ms);
-            //    }
-            //}
-            //sw.Stop();
-            //Console.WriteLine($"PROTO Deserialize: {sw.ElapsedMilliseconds} ms.");
-
-            ///////////////////////////////////////////////////////////////
-
-
-            //sw.Start();
-            //for (var i = 0; i < count; i++)
-            //{
-            //    var bytes = instance.Serialize();
-            //}
-            //sw.Stop();
-            //Console.WriteLine($"OWN Serialize: {sw.ElapsedMilliseconds} ms.");
-
-            //byte[] data4 = instance.Serialize();
-
-            //Console.WriteLine($"OWN Size: {data4.Length} bytes.");
-            //sw.Start();
-            //for (var i = 0; i < count; i++)
-            //{
-            //    var o = TestContractClass.Deserialize(data4);
-            //}
-            //sw.Stop();
-            //Console.WriteLine($"OWN Deserialize: {sw.ElapsedMilliseconds} ms.");
-
-
-            Task.Factory.StartNew(Server);
-            Task.Factory.StartNew(Client);
+            //Task.Factory.StartNew(Server);
+            //Task.Factory.StartNew(Client);
             Console.ReadLine();
         }
 

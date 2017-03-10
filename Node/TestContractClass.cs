@@ -2,11 +2,311 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
+using System.Reflection;
 using System.Text;
 
 namespace Node
 {
-    public enum TestEnum
+    public class Builder<T>
+    {
+        public Builder()
+        {
+            Index = 0;
+        }
+
+        public int Index { set; get; }
+
+        public List<Action<T, byte[]>> Retrivers { set; get; } = new List<Action<T, byte[]>>();
+
+        public List<Action<T, List<byte[]>>> Builds { set; get; } = new List<Action<T, List<byte[]>>>();
+    }
+
+    public static class ManualSerializer
+    {
+        const int lengthSize = 2;
+
+        static Action<T, List<byte[]>> BuildAddAccessor<T>(Expression<Func<Action<T, List<byte[]>>>> method)
+        {
+            return method.Compile()();
+        }
+
+        static Action<T, byte[]> BuildRetriverAccessor<T>(Expression<Func<Action<T, byte[]>>> method)
+        {
+            return method.Compile()();
+        }
+
+        static Action<T, object> BuildSetAccessor<T>(MethodInfo method)
+        {
+            var obj = Expression.Parameter(typeof(T), "o");
+            var value = Expression.Parameter(typeof(object));
+
+            var expr = Expression.Lambda<Action<T, object>>(
+                    Expression.Call(
+                        Expression.Convert(obj, method.DeclaringType),
+                        method,
+                        Expression.Convert(value, method.GetParameters()[0].ParameterType)),
+                    obj,
+                    value);
+
+            return expr.Compile();
+        }
+
+        static Func<T, object> BuildGetAccessor<T>(MethodInfo method)
+        {
+            var obj = Expression.Parameter(typeof(T), "o");
+
+            var expr = Expression.Lambda<Func<T, object>>(
+                    Expression.Convert(
+                        Expression.Call(
+                            Expression.Convert(obj, method.DeclaringType),
+                            method),
+                        typeof(object)),
+                    obj);
+
+            return expr.Compile();
+        }
+
+        public static Builder<TSource> Build<TSource>(this TSource source)
+        {
+            var builder = new Builder<TSource>();
+            var properties = source.GetType().GetProperties();
+
+            foreach (var property in properties)
+            {
+                var setter = BuildSetAccessor<TSource>(property.SetMethod);
+                var getter = BuildGetAccessor<TSource>(property.GetMethod);
+                builder.Add(property.PropertyType, getter);
+                builder.Retrive(property.PropertyType, setter);
+            }
+
+            return builder;
+        }
+
+        public static Builder<TSource> Retrive<TSource>(this Builder<TSource> source, Type type, Action<TSource, object> setter)
+        {
+            Action<TSource, byte[]> method = null;
+            if (type == typeof(string))
+            {
+                method = (item, buffer) =>
+                {
+                    var length = BitConverter.ToInt16(buffer, source.Index);
+                    source.Index += lengthSize;
+
+                    var data = new byte[length];
+
+                    Buffer.BlockCopy(buffer, source.Index, data, 0, length);
+
+                    source.Index += length;
+
+                    var text = Encoding.UTF8.GetString(data);
+
+                    setter(item, text);
+                };
+            }
+            else if (type == typeof(byte[]))
+            {
+                method = (item, buffer) => {
+                    var length = BitConverter.ToInt16(buffer, source.Index);
+                    source.Index += lengthSize;
+                    var data = new byte[length];
+
+                    Buffer.BlockCopy(buffer, source.Index, data, 0, length);
+
+                    source.Index += length;
+
+                    setter(item, data);
+                };
+            }
+            else if (type == typeof(int))
+            {
+                method = (item, buffer) => {
+                    var number = BitConverter.ToInt32(buffer, source.Index);
+                    source.Index += sizeof(int);
+                    setter(item, number);
+                }; 
+            }
+            else if (type == typeof(long))
+            {
+                method = (item, buffer) => {
+                    var number = BitConverter.ToInt64(buffer, source.Index);
+                    source.Index += sizeof(long);
+                    setter(item, number);
+                };
+            }
+            else if (type == typeof(bool))
+            {
+                method = (item, buffer) => {
+                    var boolean = BitConverter.ToBoolean(buffer, source.Index);
+                    source.Index += sizeof(bool);
+                    setter(item, boolean);
+                };  
+            }
+            else if (type == typeof(DateTime))
+            {
+                method = (item, buffer) => {
+                    var ticks = BitConverter.ToInt64(buffer, source.Index);
+                    source.Index += sizeof(long);
+                    setter(item, new DateTime(ticks));
+                };
+            }
+            else if (type == typeof(List<string>))
+            {
+                method = (item, buffer) => {
+                    var length = BitConverter.ToInt16(buffer, source.Index);
+                    source.Index += lengthSize;
+                    var data = new byte[length];
+
+                    Buffer.BlockCopy(buffer, source.Index, data, 0, length);
+
+                    source.Index += length;
+
+                    var list = Encoding.UTF8.GetString(data).Split('|').ToList();
+
+                    setter(item, list);
+                };
+                
+            }
+            else if (type.IsEnum)
+            {
+                method = (item, buffer) => {
+                    var value = Buffer.GetByte(buffer, source.Index);
+                    source.Index += sizeof(byte);
+                    setter(item, value);
+                }; 
+            }
+
+            var retriver = BuildRetriverAccessor(() => method);
+            source.Retrivers.Add(retriver);
+
+            return source;
+        }
+
+        public static Builder<TSource> Add<TSource>(this Builder<TSource> source, Type type, Func<TSource, object> getter)
+        {
+            Action<TSource, List<byte[]>> method = null;
+
+            if (type == typeof(string))
+            {
+                method = (src, blocks) => {
+                    var item = getter(src);
+                    var text = (string)item;
+                    var bytes = Encoding.UTF8.GetBytes(text);
+                    var length = BitConverter.GetBytes((ushort)bytes.Length);
+
+                    blocks.Add(length);
+                    blocks.Add(bytes);
+                };  
+            }
+            else if (type == typeof(byte[]))
+            {
+                method = (src, blocks) => {
+                    var item = getter(src);
+                    var bytes = (byte[])item;
+                    var length = BitConverter.GetBytes((ushort)bytes.Length);
+
+                    blocks.Add(length);
+                    blocks.Add(bytes);
+                }; 
+            }
+            else if (type == typeof(int))
+            {
+                method = (src, blocks) => {
+                    var item = getter(src);
+                    var bytes = BitConverter.GetBytes((int)item);
+                    blocks.Add(bytes);
+                };  
+            }
+            else if (type == typeof(long))
+            {
+                method = (src, blocks) => {
+                    var item = getter(src);
+                    var bytes = BitConverter.GetBytes((long)item);
+                    blocks.Add(bytes);
+                };
+            }
+            else if (type == typeof(bool))
+            {
+                method = (src, blocks) => {
+                    var item = getter(src);
+                    var bytes = BitConverter.GetBytes((bool)item);
+                    blocks.Add(bytes);
+                };
+            }
+            else if(type == typeof(DateTime))
+            {
+                method = (src, blocks) => {
+                    var item = getter(src);
+                    var dateTime = (DateTime)item;
+                    var bytes = BitConverter.GetBytes(dateTime.Ticks);
+                    blocks.Add(bytes);
+                };
+            }
+            else if (type == typeof(List<string>))
+            {
+                method = (src, blocks) => {
+                    var item = getter(src);
+
+                    var list = (List<string>)item;
+
+                    var text = list.Aggregate((i, j) => i + "|" + j);
+
+                    var bytes = Encoding.UTF8.GetBytes(text);
+                    var length = BitConverter.GetBytes((ushort)bytes.Length);
+
+                    blocks.Add(length);
+                    blocks.Add(bytes);
+                };
+            }
+            else if (type.IsEnum)
+            {
+                method = (src, blocks) => {
+                    var item = getter(src);
+                    blocks.Add(new byte[1] { (byte)item });
+                };
+            }
+
+            var builder = BuildAddAccessor(() => method);
+            source.Builds.Add(builder);
+
+            return source;
+        }
+
+        public static byte[] Serialize<TSource>(this Builder<TSource> source, TSource instance)
+        {
+            var blocks = new List<byte[]>();
+
+            foreach (var action in source.Builds)
+            {
+                action(instance, blocks);
+            }
+
+            var length = blocks.Select(f => f.Length).Sum();
+            var buffer = new byte[length];
+
+            var offset = 0;
+            foreach(var item in blocks)
+            {
+                Buffer.BlockCopy(item, 0, buffer, offset, item.Length);
+                offset += item.Length;
+            }
+
+            return buffer;
+        }
+
+        public static TSource Deserialize<TSource>(this Builder<TSource> source, byte[] data)
+        {
+            var item = Activator.CreateInstance<TSource>();
+            source.Index = 0;
+            foreach (var action in source.Retrivers)
+            {
+                action(item, data);
+            }
+            return item;
+        }
+    }
+
+    public enum TestEnum : byte
     {
         One,
         Two,
@@ -36,80 +336,5 @@ namespace Node
 
         [ProtoMember(7)]
         public TestEnum TestEnum { get; set; }
-
-        public byte[] Serialize()
-        {
-            var lengthSize = 2;
-
-            var one = Encoding.UTF8.GetBytes(One);
-
-            var two = BitConverter.GetBytes(Two.Ticks);
-
-            var count = BitConverter.GetBytes(Count);
-
-            var active = BitConverter.GetBytes(Active);
-
-            var strList = Strings.Aggregate((i, j) => i + "|" + j);
-            var listBytes = Encoding.UTF8.GetBytes(strList);
-
-            var oneSize = BitConverter.GetBytes((ushort)one.Length);
-            var threeSize = BitConverter.GetBytes((ushort)Three.Length);
-            var listBytesSize = BitConverter.GetBytes((ushort)listBytes.Length);
-
-            var buffer = new byte[lengthSize + one.Length + two.Length + threeSize.Length + Three.Length + count.Length + active.Length + listBytesSize.Length + listBytes.Length + 2];
-
-            Buffer.BlockCopy(oneSize, 0, buffer, 0, lengthSize);
-            Buffer.BlockCopy(one, 0, buffer, lengthSize, one.Length);
-            Buffer.BlockCopy(two, 0, buffer, lengthSize + one.Length, two.Length);
-            Buffer.BlockCopy(threeSize, 0, buffer, lengthSize + one.Length + two.Length, threeSize.Length);
-            Buffer.BlockCopy(Three, 0, buffer, lengthSize + one.Length + two.Length + threeSize.Length, Three.Length);
-
-            Buffer.BlockCopy(count, 0, buffer, lengthSize + one.Length + two.Length + threeSize.Length + Three.Length, count.Length);
-
-            Buffer.BlockCopy(active, 0, buffer, lengthSize + one.Length + two.Length + threeSize.Length + Three.Length + count.Length, active.Length);
-
-            Buffer.BlockCopy(listBytesSize, 0, buffer, lengthSize + one.Length + two.Length + threeSize.Length + Three.Length + count.Length + active.Length, listBytesSize.Length);
-
-            Buffer.BlockCopy(listBytes, 0, buffer, lengthSize + one.Length + two.Length + threeSize.Length + Three.Length + count.Length + active.Length + listBytesSize.Length, listBytes.Length);
-
-            Buffer.SetByte(buffer, lengthSize + one.Length + two.Length + threeSize.Length + Three.Length + count.Length + active.Length + listBytesSize.Length + listBytes.Length + 1, (byte)TestEnum);
-
-            return buffer;
-        }
-
-        public static TestContractClass Deserialize(byte[] bytes)
-        {
-            var lengthSize = 2;
-
-            var contract = new TestContractClass();
-
-            var oneSize = BitConverter.ToInt16(bytes, 0);
-            var oneBytes = new byte[oneSize];
-            Buffer.BlockCopy(bytes, lengthSize, oneBytes, 0, oneSize);
-            contract.One = Encoding.UTF8.GetString(oneBytes);
-
-            var two = BitConverter.ToInt64(bytes, lengthSize + oneSize);
-            contract.Two = new DateTime(two);
-
-            var threeSize = BitConverter.ToInt16(bytes, lengthSize + oneSize + 8);
-
-            contract.Three = new byte[threeSize];
-
-            Buffer.BlockCopy(bytes, lengthSize + oneSize + 8 + lengthSize, contract.Three, 0, threeSize);
-
-            contract.Count = BitConverter.ToInt64(bytes, lengthSize + oneSize + 8 + lengthSize + threeSize);
-            contract.Active = BitConverter.ToBoolean(bytes, lengthSize + oneSize + 8 + lengthSize + threeSize + 8);
-
-            var listSize = BitConverter.ToInt16(bytes, lengthSize + oneSize + 8 + lengthSize + threeSize + 8 + 1);
-            var listBytes = new byte[listSize];
-
-            Buffer.BlockCopy(bytes, lengthSize + oneSize + 8 + lengthSize + threeSize + 8 + 1 + lengthSize, listBytes, 0, listSize);
-
-            contract.Strings = Encoding.UTF8.GetString(listBytes).Split('|').ToList();
-
-            contract.TestEnum = (TestEnum)Buffer.GetByte(bytes, lengthSize + oneSize + 8 + lengthSize + threeSize + 8 + 1 + lengthSize + listSize + 1);
-
-            return contract;
-        }
     }
 }
