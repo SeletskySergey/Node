@@ -51,6 +51,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="NanoSerializer.cs" />
     <Compile Include="Node.cs" />
     <Compile Include="App.cs" />
     <Compile Include="Message.cs" />

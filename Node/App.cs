@@ -1,5 +1,4 @@
 ﻿using Newtonsoft.Json;
-using Newtonsoft.Json.Bson;
 using ProtoBuf;
 using ProtoBuf.Meta;
 using System;
@@ -11,7 +10,6 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace Node
 {
@@ -78,23 +76,23 @@ namespace Node
 
         public static void NanoTest(int count)
         {
-            var model = instance.Build();
+            var serializer = NanoSerializer.Build<TestContractClass>();
 
             var sw = Stopwatch.StartNew();
             for (var i = 0; i < count; i++)
             {
-                var bytes = model.Serialize(instance);
+                var bytes = serializer.Serialize(instance);
             }
             sw.Stop();
             Console.WriteLine($"NANO Serialize: {sw.ElapsedMilliseconds} ms.");
 
-            byte[] data5 = model.Serialize(instance);
+            byte[] data5 = serializer.Serialize(instance);
 
             Console.WriteLine($"NANO Size: {data5.Length} bytes.");
             sw.Start();
             for (var i = 0; i < count; i++)
             {
-                var cls = model.Deserialize(data5);
+                var cls = serializer.Deserialize(data5);
             }
             sw.Stop();
             Console.WriteLine($"NANO Deserialize: {sw.ElapsedMilliseconds} ms.\n");
@@ -123,14 +121,15 @@ namespace Node
 
         private static void Main()
         {
-            RuntimeTypeModel.Default.Add(typeof(TestContractClass), true);
-            RuntimeTypeModel.Default.CompileInPlace();
+            //RuntimeTypeModel.Default.Add(typeof(TestContractClass), true);
+            //RuntimeTypeModel.Default.CompileInPlace();
 
-            var count = 100000;
+            var count = 1000000;
 
-            //JsonTest(count);
-            ProtoTest(count);
             NanoTest(count);
+            //ProtoTest(count);
+            //JsonTest(count);
+
 
             //Task.Factory.StartNew(Server);
             //Task.Factory.StartNew(Client);
