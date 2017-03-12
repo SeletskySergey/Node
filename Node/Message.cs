@@ -3,8 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Text;
-using Newtonsoft.Json;
 using ProtoBuf;
 
 namespace Node
@@ -20,7 +18,7 @@ namespace Node
             Command = command;
             Action = action;
             Data = new byte[0];
-            Contract = new TestContractClass();
+            Contract = new TestContract();
         }
 
         private const ushort HeaderSize = 12;
@@ -59,12 +57,8 @@ namespace Node
 
             using (var ms = new MemoryStream(msg.Data))
             {
-                msg.Contract = Serializer.Deserialize(typeof(TestContractClass), ms);
+                msg.Contract = Serializer.Deserialize(types[typeId], ms);
             }
-
-
-            //var json = Encoding.UTF8.GetString(msg.Data);
-            //msg.Contract = JsonConvert.DeserializeObject(json, types[typeId]);
 
             return msg;
         }
@@ -80,9 +74,6 @@ namespace Node
                 Serializer.Serialize(ms, Contract);
                 Data = ms.ToArray();
             }
-
-            //var json = JsonConvert.SerializeObject(Contract);
-            //Data = Encoding.UTF8.GetBytes(json);
 
             var buffer = new byte[HeaderSize + Data.Length];
 

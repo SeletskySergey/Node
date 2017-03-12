@@ -1,103 +1,17 @@
-﻿using Newtonsoft.Json;
-using ProtoBuf;
-using ProtoBuf.Meta;
+﻿using ProtoBuf.Meta;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
-using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace Node
 {
     internal class App
     {
-        public static void JsonTest(int count)
-        {
-            var sw = Stopwatch.StartNew();
-            for (var i = 0; i < count; i++)
-            {
-                var x = JsonConvert.SerializeObject(instance);
-                var bytes = Encoding.UTF8.GetBytes(x);
-            }
-            sw.Stop();
-            Console.WriteLine($"JSON Serialize: {sw.ElapsedMilliseconds} ms.");
-
-            var json = JsonConvert.SerializeObject(instance);
-            var l1 = Encoding.UTF8.GetBytes(json);
-            Console.WriteLine($"JSON Size: {l1.Length} bytes.");
-
-            sw.Restart();
-            for (var i = 0; i < count; i++)
-            {
-                var x = JsonConvert.DeserializeObject(json, typeof(TestContractClass));
-            }
-            sw.Stop();
-            Console.WriteLine($"JSON Deserialize: {sw.ElapsedMilliseconds} ms.\n");
-        }
-
-        public static void ProtoTest(int count)
-        {
-            var sw = Stopwatch.StartNew();
-            for (var i = 0; i < count; i++)
-            {
-                using (var ms = new MemoryStream())
-                {
-                    Serializer.Serialize(ms, instance);
-                    var bytes = ms.ToArray();
-                }
-            }
-            sw.Stop();
-            Console.WriteLine($"PROTO Serialize: {sw.ElapsedMilliseconds} ms.");
-
-
-            byte[] data;
-            using (var ms = new MemoryStream())
-            {
-                Serializer.Serialize(ms, instance);
-                data = ms.ToArray();
-            }
-            Console.WriteLine($"PROTO Size: {data.Length} bytes.");
-
-            sw.Start();
-            for (var i = 0; i < count; i++)
-            {
-                using (var ms = new MemoryStream(data))
-                {
-                    var o = Serializer.Deserialize(typeof(TestContractClass), ms);
-                }
-            }
-            sw.Stop();
-            Console.WriteLine($"PROTO Deserialize: {sw.ElapsedMilliseconds} ms.\n");
-        }
-
-        public static void NanoTest(int count)
-        {
-            var serializer = NanoSerializer.Build<TestContractClass>();
-
-            var sw = Stopwatch.StartNew();
-            for (var i = 0; i < count; i++)
-            {
-                var bytes = serializer.Serialize(instance);
-            }
-            sw.Stop();
-            Console.WriteLine($"NANO Serialize: {sw.ElapsedMilliseconds} ms.");
-
-            byte[] data5 = serializer.Serialize(instance);
-
-            Console.WriteLine($"NANO Size: {data5.Length} bytes.");
-            sw.Start();
-            for (var i = 0; i < count; i++)
-            {
-                var cls = serializer.Deserialize(data5);
-            }
-            sw.Stop();
-            Console.WriteLine($"NANO Deserialize: {sw.ElapsedMilliseconds} ms.\n");
-        }
-
         private static readonly IPEndPoint local;
 
         static App()
@@ -108,7 +22,7 @@ namespace Node
 
         const int globalCount = 10000;
 
-        static TestContractClass instance = new TestContractClass()
+        static TestContract instance = new TestContract()
         {
             One = "sdfsdfsdfsdfsdfsdfsdfsdfsdfsdfsdfsdfsdfsdfsdfsdfsdfsdfsdfsdfsdfsdfsdfsdf",
             Count = 35346457567,
@@ -116,23 +30,16 @@ namespace Node
             Two = DateTime.Now,
             Active = true,
             Strings = new List<string> { "", "one", "two", "one", "two", "one", "two", "one", "two" },
-            TestEnum = TestEnum.Three
+            TestEnum = TestContract.Test.Three
         };
 
         private static void Main()
         {
-            //RuntimeTypeModel.Default.Add(typeof(TestContractClass), true);
-            //RuntimeTypeModel.Default.CompileInPlace();
+            RuntimeTypeModel.Default.Add(typeof(TestContract), true);
+            RuntimeTypeModel.Default.CompileInPlace();
 
-            var count = 1000000;
-
-            NanoTest(count);
-            //ProtoTest(count);
-            //JsonTest(count);
-
-
-            //Task.Factory.StartNew(Server);
-            //Task.Factory.StartNew(Client);
+            Task.Factory.StartNew(Server);
+            Task.Factory.StartNew(Client);
             Console.ReadLine();
         }
 
@@ -143,7 +50,7 @@ namespace Node
 
             var server = new Host(local);
 
-            server.Subscribe<TestContractClass>(msg =>
+            server.Subscribe<TestContract>(msg =>
             {
                 if (count == 0)
                 {
@@ -180,7 +87,7 @@ namespace Node
 
             var client = new Node(local);
 
-            client.Subscribe<TestContractClass>(msg =>
+            client.Subscribe<TestContract>(msg =>
             {
                 if (count == 0)
                 {

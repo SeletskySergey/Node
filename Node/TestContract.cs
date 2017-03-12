@@ -4,16 +4,16 @@ using System.Collections.Generic;
 
 namespace Node
 {
-    public enum TestEnum : byte
-    {
-        One,
-        Two,
-        Three
-    }
-
     [ProtoContract]
-    public class TestContractClass
+    public class TestContract
     {
+        public enum Test : byte
+        {
+            One,
+            Two,
+            Three
+        }
+
         [ProtoMember(1)]
         public string One { set; get; }
 
@@ -33,6 +33,6 @@ namespace Node
         public List<string> Strings { get; set; } = new List<string>();
 
         [ProtoMember(7)]
-        public TestEnum TestEnum { get; set; }
+        public Test TestEnum { get; set; }
     }
 }
